@@ -21,9 +21,20 @@ class Steganographer {
             val outputFile = File(outputFileName)
 
             println("Message to hide:")
-            val message = readln()
-            val byteMessage = byteArrayOf(*message.encodeToByteArray(), 0, 0, 3)
-            val messageBits = byteMessage.map { byte ->
+            val message = readln().trim()
+            val byteArrayMessage = message.encodeToByteArray()
+
+            println("Password:")
+            val password = readln().trim()
+            val byteArrayPassword = password.encodeToByteArray()
+
+            val encryptedMessage =
+                byteArrayMessage.mapIndexed { index, byteMessage ->
+                    (byteMessage.toInt() xor byteArrayPassword[index % byteArrayPassword.size].toInt()).toByte()
+                }
+            val byteArrayEncryptedMessage = byteArrayOf(*encryptedMessage.toByteArray(), 0, 0, 3)
+
+            val messageBits = byteArrayEncryptedMessage.map { byte ->
                 (0 until Byte.SIZE_BITS).map { (byte.rotateLeft(it).toInt() and MSB) / MSB }
             }.flatten()
 
@@ -31,9 +42,6 @@ class Steganographer {
                 println("The input image is not large enough to hold this message.")
                 return
             }
-
-            println("Input Image: $inputFileName")
-            println("Output Image: $outputFileName")
 
             messageBits.forEachIndexed { index, bit ->
                 val x = index % image.width
@@ -53,30 +61,42 @@ class Steganographer {
     }
 
     fun show() {
-        println("Input image file:")
-        val inputFileName = readln().trim()
-        val inputFile = File(inputFileName)
-        val image = ImageIO.read(inputFile)
-        val byteMessage = mutableListOf<Byte>()
+        try {
+            println("Input image file:")
+            val inputFileName = readln().trim()
+            val inputFile = File(inputFileName)
+            val image = ImageIO.read(inputFile)
 
-        for (byte in (0 until image.width * image.height)
-            .map { pixelPosition ->
-                Color(
-                    image.getRGB(
-                        pixelPosition % image.width,
-                        pixelPosition / image.width
-                    )
-                ).blue and LSB
+            println("Password:")
+            val password = readln().trim()
+            val byteArrayPassword = password.encodeToByteArray()
+
+            val byteMessage = mutableListOf<Byte>()
+            for (byte in (0 until image.width * image.height)
+                .map { pixelPosition ->
+                    Color(
+                        image.getRGB(
+                            pixelPosition % image.width,
+                            pixelPosition / image.width
+                        )
+                    ).blue and LSB
+                }
+                .chunked(Byte.SIZE_BITS)
+                .map { byteList -> byteList.reduce { byte, bit -> (byte shl 1) or bit } }) {
+                byteMessage.add(byte.toByte())
+                if (byteMessage.size >= 3 && byteMessage.takeLast(3) == listOf<Byte>(0, 0, 3)) {
+                    byteMessage.dropLast(3)
+                    break
+                }
             }
-            .chunked(Byte.SIZE_BITS)
-            .map { byteList -> byteList.reduce { byte, bit -> (byte shl 1) or bit } }) {
-            byteMessage.add(byte.toByte())
-            if (byteMessage.size >= 3 && byteMessage.takeLast(3) == listOf<Byte>(0, 0, 3)) {
-                byteMessage.dropLast(3)
-                break
+
+            val decryptedByteMessage = byteMessage.mapIndexed { index, byte ->
+                (byte.toInt() xor byteArrayPassword[index % byteArrayPassword.size].toInt()).toByte()
             }
+
+            println("Message: ${decryptedByteMessage.toByteArray().toString(Charsets.UTF_8)}")
+        } catch (e: IOException) {
+            println("Can't write output file!")
         }
-
-        println("Message: ${byteMessage.toByteArray().toString(Charsets.UTF_8)}")
     }
 }
