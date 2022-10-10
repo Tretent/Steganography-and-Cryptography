@@ -1,2 +1,2 @@
 # Steganography-and-Cryptography
-Kotlin Basics Steganography and Cryptography project
+JetBrains Academy Kotlin Basics Steganography and Cryptography project
